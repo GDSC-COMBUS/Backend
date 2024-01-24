@@ -19,4 +19,5 @@ public class BusResponseDto {
         this.busRouteAbrv = busRouteAbrv;
         this.low = low;
     }
+
 }

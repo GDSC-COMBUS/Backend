@@ -24,4 +24,8 @@ public class BusStopDto {
         this.gpsY = gpsY;
         this.seq = seq;
     }
+    public BusStopDto(String arsId, String name){
+        this.arsId = arsId;
+        this.name = name;
+    }
 }

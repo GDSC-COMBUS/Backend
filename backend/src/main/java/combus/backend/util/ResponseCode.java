@@ -15,6 +15,7 @@ public enum ResponseCode {
     SIGNOUT_SUCCESS(OK, "로그아웃 성공"),
     EMPTY_RESERVATION_SUCCESS(OK, "예약 내역 존재하지 않습니다"),
     LOAD_RESERVATION_SUCCESS(OK,"예약 내역을 성공적으로 불러왔습니다"),
+    ROUTE_SUCCESS(OK, "노선 불러오기 성공"),
 
 
     /* 201 CREATED : 요청 성공, 자원 생성 */
@@ -22,7 +23,7 @@ public enum ResponseCode {
 
 
     /* 400 BAD_REQUEST : 잘못된 요청 */
-
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error"),
 
     /* 401 UNAUTHORIZED : 인증되지 않은 사용자 */
     SESSION_EXPIRED(UNAUTHORIZED,"세션이 만료되었습니다. 다시 로그인해주세요"),

@@ -1,3 +1,4 @@
+//BusRouteService
 package combus.backend.service;
 
 import combus.backend.domain.BusMatch;
@@ -26,69 +27,51 @@ import java.util.Optional;
 @Service
 public class BusRouteService {
 
-    @Autowired
     private RestTemplate restTemplate;
-
-    private final BusMatchRepository busMatchRepository;  // BusMatchRepository 추가
-
+    private BusMatchRepository busMatchRepository;
 
     @Value("${serviceKey}")
-    String serviceKey;
+    private String serviceKey;
 
-    // 버스 노선 번호로 해당 버스가 경유하는 정류장 리스트를 넘겨주는 공공 데이터 url
     String getRouteInfoURL = "http://ws.bus.go.kr/api/rest/busRouteInfo/getStaionByRoute?";
 
-    public BusRouteService(RestTemplate restTemplate, BusMatchRepository busMatchRepository) {
-        this.restTemplate = restTemplate;
-        this.busMatchRepository = busMatchRepository;
-    }
+    public List<BusStopDto> getBusRoutesByDriverId(Long driverId) {
+        try {
+            // BusMatchRepository를 통해 노선 조회
+            Optional<BusMatch> busMatchOptional = busMatchRepository.findBusRouteIdByDriverId(driverId);
 
-    //    public List<BusStopDto> getBusStopsByDriverId(Long driverId) throws Exception {
-//        Optional<BusMatch> busMatchOptional = BusMatchRepository.findBusRouteIdByDriverId(driverId);
-//
-//        if (busMatchOptional.isPresent()) {
-//            BusMatch busMatch = busMatchOptional.get();
-//            Long busRouteId = busMatch.getBusId();
-//
-//            // Use RestTemplate to make a request to the public bus route information API
-//            String url = getRouteInfoURL + "ServiceKey=" + serviceKey + "&busRouteId=" + busRouteId;
-//            System.out.println(url);
-//
-//            URI uri = new URI(url);
-//            String xmlData = restTemplate.getForObject(uri, String.class);
-//
-//            // Parse the XML response and retrieve the list of bus stops
-//            return parseXmlWithDom(xmlData);
-//        } else {
-//            // Handle the case when no BusMatch is found for the given driverId
-//            throw new ChangeSetPersister.NotFoundException("BusMatch not found for driverId: " + driverId);
-//        }
-//    }
-public List<BusStopDto> getBusRoutesByDriverId(Long driverId) {
-    try {
-        // BusMatchRepository를 통해 노선 조회
-        Optional<BusMatch> busMatchOptional = busMatchRepository.findBusRouteIdByDriverId(driverId);
+            if (busMatchOptional.isPresent()) {
+                BusMatch busMatch = busMatchOptional.get();
+                Long busId = busMatch.getBusId();
 
-        if (busMatchOptional.isPresent()) {
-            BusMatch busMatch = busMatchOptional.get();
-            Long busRouteId = busMatch.getBusId();
+                // 1. 첫 번째 API 호출: http://ws.bus.go.kr/api/rest/busRouteInfo/getBusRouteList
+                String getBusRouteListURL = "http://ws.bus.go.kr/api/rest/busRouteInfo/getBusRouteList";
+                String routeListUrl = getBusRouteListURL + "?ServiceKey=" + serviceKey + "&strSrch=" + busId;
+                URI routeListUri = new URI(routeListUrl);
+                String routeListXmlData = restTemplate.getForObject(routeListUri, String.class);
 
-            // 공공 버스 노선 정보 API에 요청을 보내고 응답을 파싱하여 정류장 리스트를 반환
-            String url = getRouteInfoURL + "ServiceKey=" + serviceKey + "&busRouteId=" + busRouteId;
-            URI uri = new URI(url);
-            String xmlData = restTemplate.getForObject(uri, String.class);
-            return parseXmlWithDom(xmlData);
-        } else {
-            // BusMatch가 없는 경우에 대한 처리
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "BusMatch not found for driverId: " + driverId);
+                // 2. XML 파싱을 통해 busRouteId 추출
+                Long busRouteId = parseXmlToGetBusRouteId(routeListXmlData);
+
+                // 3. 두 번째 API 호출: http://ws.bus.go.kr/api/rest/busRouteInfo/getStaionByRoute
+                String getStaionByRouteURL = "http://ws.bus.go.kr/api/rest/busRouteInfo/getStaionByRoute";
+                String stationUrl = getStaionByRouteURL + "?ServiceKey=" + serviceKey + "&busRouteId=" + busRouteId;
+                URI stationUri = new URI(stationUrl);
+                String stationXmlData = restTemplate.getForObject(stationUri, String.class);
+
+                // 4. XML 파싱을 통해 정류장 리스트 추출
+                return parseXmlToGetStations(stationXmlData);
+            } else {
+                // BusMatch가 없는 경우에 대한 처리
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "BusMatch not found for driverId: " + driverId);
+            }
+        } catch (Exception e) {
+            // 예외 처리
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", e);
         }
-    } catch (Exception e) {
-        // 예외 처리
-        throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", e);
     }
-}
 
-    public List<BusStopDto> parseXmlWithDom(String xml) throws Exception {
+    public List<BusStopDto> parseXmlToGetStations(String xml) throws Exception {
         List<BusStopDto> busRoutes = new ArrayList<>();
 
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -105,16 +88,38 @@ public List<BusStopDto> getBusRoutesByDriverId(Long driverId) {
             if (itemListNode.getNodeType() == Node.ELEMENT_NODE) {
                 Element itemListElement = (Element) itemListNode;
 
-                BusStopDto busStopDto;
 
                 String arsId = getElementValue(itemListElement, "arsId");
                 String name = getElementValue(itemListElement, "stationNm");
 
-                busStopDto = new BusStopDto(arsId, name);
+                BusStopDto busStopDto = new BusStopDto(arsId, name);
                 busRoutes.add(busStopDto);
             }
         }
         return busRoutes;
+    }
+
+    private Long parseXmlToGetBusRouteId(String xml) throws Exception {
+
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document document = builder.parse(new InputSource(new StringReader(xml)));
+
+        NodeList nodeList = document.getElementsByTagName("item");
+
+        if (nodeList.getLength() > 0) {
+            Node itemNode = nodeList.item(0);
+            if (itemNode.getNodeType() == Node.ELEMENT_NODE) {
+                Element itemElement = (Element) itemNode;
+
+                // XML에서 busRouteId 추출
+                String busRouteIdString = getElementValue(itemElement, "busRouteId");
+                return Long.parseLong(busRouteIdString);
+            }
+        }
+
+        // 파싱에 실패한 경우
+        throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to parse busRouteId from XML");
     }
 
     private String getElementValue(Element element, String tagName) {

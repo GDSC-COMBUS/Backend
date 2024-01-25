@@ -1,3 +1,4 @@
+//driverController
 package combus.backend.controller;
 
 import combus.backend.domain.Driver;
@@ -31,22 +32,11 @@ import java.util.List;
 public class DriverController {
 
     private final DriverService driverService;
-    private final DriverRepository driverRepository;
-    private final BusRouteService busRouteService;
 
     @Autowired
-    public DriverController(DriverService driverService, DriverRepository driverRepository, BusRouteService busRouteService) {
+    public DriverController(DriverService driverService) {
         this.driverService = driverService;
-        this.driverRepository = driverRepository;
-        this.busRouteService = busRouteService;
     }
-
-    @Autowired
-    private RestTemplate restTemplate;
-
-    @Value("${serviceKey}")
-    String serviceKey;
-
 
 
     @PostMapping("/login")
@@ -77,74 +67,8 @@ public class DriverController {
         session.setAttribute("userId", driver.getId());
         session.setMaxInactiveInterval(7200); // Session이 2시간동안 유지
 
+        Long driverId = driver.getId();
+
         return ResponseData.toResponseEntity(ResponseCode.SIGNIN_SUCCESS, loginDriver);
     }
-
-//    @GetMapping("/home")
-//    public List<BusResponseDto> getBusRoutesByDriverId(Long driverId)
-//    {
-//        try {
-//            // BusRouteService를 통해 노선 조회
-//           BusResponseDto busRoutes = new BusResponseDto(String vehId, String busRouteId, String busRouteAbrv, int low);
-//           return (List<BusResponseDto>) ResponseData.toResponseEntity(ResponseCode.ROUTE_SUCCESS,busRoutes);
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-//        }
-//    }
-//}
-
-//    @GetMapping("/home")
-//    public ResponseEntity<ResponseData<List<BusStopDto>>> getBusRoutesByDriverId(@RequestParam(value = "driverId") Long driverId) {
-//        try {
-//            // BusRouteService를 통해 노선 조회
-//            List<BusResponseDto> busRoutes = busRouteService.getBusRoutesByDriverId(driverId);
-//            return ResponseData.toResponseEntity(ResponseCode.ROUTE_SUCCESS, busRoutes);
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-//        }
-//    }
-
-//    @GetMapping("/home")
-//    public ResponseEntity<ResponseData<List<BusStopDto>>> getBusRoutesByDriverId(
-//            @RequestParam(value = "driverId") Long driverId
-//    ) {
-//        try {
-//            // BusRouteService를 통해 노선 조회
-//            List<BusStopDto> busStopList = busRouteService.getBusRoutesByDriverId(driverId);
-//            return ResponseData.toResponseEntity(ResponseCode.ROUTE_SUCCESS, busStopList);
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            return ResponseData.toResponseEntity(ResponseCode.INTERNAL_SERVER_ERROR, null);
-//        }
-//    }
-
-    // 버스 정류장 ID로 해당 정류장을 경유하는 버스 데이터를 넘겨주는 공공 데이터 url
-    String getStationByUidItemURL = "http://ws.bus.go.kr/api/rest/stationinfo/getStationByUid?";
-
-    // 버스 노선 번호로 해당 버스가 경유하는 정류장 리스트를 넘겨주는 공공 데이터 url
-    String getBusRouteInfoURL = "http://ws.bus.go.kr/api/rest/busRouteInfo/getStaionByRoute?";
-
-
-    @GetMapping("/home")
-    public ResponseEntity<List<BusStopDto>> getBusRoutesByDriverId(
-            @RequestParam(value = "driverId") Long driverId
-    ) throws Exception {
-        HttpURLConnection urlConnection = null;
-        InputStream stream = null;
-        String result = null;
-        RestTemplate restTemplate = new RestTemplate();
-
-        // 공공데이터 API 요청을 보낼 url 생성
-        String urlStr = getStationByUidItemURL + "ServiceKey=" + serviceKey + "&driverId=" + driverId;
-        System.out.println(urlStr);
-
-        URI uri = new URI(urlStr);
-        String xmlData = restTemplate.getForObject(uri, String.class);
-
-        List<BusStopDto> busStopList = busRouteService.parseXmlWithDom(xmlData);
-        return new ResponseEntity<>(busStopList, HttpStatus.OK);
-    }
-
 }

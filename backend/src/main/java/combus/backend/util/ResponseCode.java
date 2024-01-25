@@ -35,6 +35,7 @@ public enum ResponseCode {
 
     /* 404 NOT_FOUND : Resource 를 찾을 수 없음 */
     ACCOUNT_NOT_FOUND(NOT_FOUND, "계정 정보를 찾을 수 없습니다"),
+    MATCH_NOT_FOUND(NOT_FOUND, "버스에 대한 정보가 없습니다.")
 
 
     /* 409 CONFLICT : Resource 의 현재 상태와 충돌. 보통 중복된 데이터 존재 */
